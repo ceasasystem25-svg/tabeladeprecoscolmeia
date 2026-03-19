@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tabela de Preços Colmeia</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        /* Reset e Fonte Moderna */
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: #eef2f3;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        /* Botão Flutuante fora do PDF */
+        .btn-exportar {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 15px 25px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            color: white;
+            font-size: 16px;
+            background-color: #ff9800;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            transition: 0.3s;
+            z-index: 2000;
+        }
+        .btn-exportar:hover { background-color: #e68a00; transform: scale(1.05); }
+        .btn-exportar:disabled { background-color: #ccc; cursor: not-allowed; transform: none; }
+
+        /* Container Principal que vai para o PDF */
+        #conteudo-pdf {
+            width: 100%;
+            max-width: 900px;
+            background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), 
+                        url('https://images.unsplash.com/photo-1610832958506-aa56368176cf?q=80&w=1200&auto=format&fit=crop') center/cover;
+            border-radius: 12px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            overflow: hidden;
+            position: relative;
+            padding-bottom: 20px;
+        }
+
+        /* Topo Fixo Moderno */
+        header {
+            position: sticky;
+            top: 0;
+            background-color: #ffffff;
+            padding: 20px;
+            text-align: center;
+            border-bottom: 3px solid #ff9800;
+            z-index: 1000;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        header h1 {
+            color: #333;
+            font-size: 24px;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        header p {
+            color: #666;
+            font-size: 14px;
+            font-style: italic;
+        }
+
+        /* Container da Tabela com Rolagem */
+        .tabela-container {
+            max-height: 60vh;
+            overflow-y: auto;
+            padding: 0 20px;
+            margin-top: 20px;
+        }
+
+        /* Tabela Moderna */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: center;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background-color: #f8f9fa;
+            color: #333;
+            font-weight: 700;
+            text-transform: uppercase;
+            font-size: 13px;
+        }
+        td:nth-child(2) {
+            text-align: left;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+        tbody tr:hover { background-color: #fcfcfc; }
+        
+        .tabela-container::-webkit-scrollbar { width: 8px; }
+        .tabela-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 8px; }
+        .tabela-container::-webkit-scrollbar-thumb { background: #ff9800; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <button class="btn-exportar" id="btn-pdf" onclick="gerarPDF()">📄 Exportar PDF Completo</button>
+
+    <div id="conteudo-pdf">
+        <header>
+            <h1>Tabela de Preços Colmeia</h1>
+            <p id="data-atual">Atualizando data...</p>
+        </header>
+
+        <div class="tabela-container" id="area-rolagem">
+            <table id="tabela-precos">
+                <thead>
+                    <tr>
+                        <th>Código</th>
+                        <th>Produto</th>
+                        <th>Peso/Qtd</th>
+                        <th>Preço/Emb.</th>
+                        <th>Preço Kg/Und</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td colspan="5" style="padding: 30px;">Conectando ao banco de dados...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // === COLE A URL DO SEU APPS SCRIPT AQUI ===
+        const API_URL = 'https://script.google.com/macros/s/AKfycbxgIXiZ0B9EB6ef4DGlU6ktUMwKNCgc_e9zRAeKYnVH_48y9avldj3YUcRSblApMYNQ/exec';
+
+        const dataHoje = new Date().toLocaleDateString('pt-BR');
+        document.getElementById('data-atual').innerText = `Atualizado em: ${dataHoje}`;
+
+        // Função que busca os dados da API via Fetch
+        async function carregarDados() {
+            try {
+                // Faz a requisição para o Google Apps Script
+                const resposta = await fetch(API_URL);
+                
+                if (!resposta.ok) throw new Error('Falha na comunicação com o servidor.');
+                
+                // Converte a resposta para JSON
+                const json = await resposta.json();
+                
+                if(json.status === "sucesso") {
+                    montarTabela(json.dados);
+                } else {
+                    throw new Error('Erro ao processar os dados da planilha.');
+                }
+            } catch (erro) {
+                mostrarErro(erro);
+            }
+        }
+
+        // Monta a tabela (mesma lógica de antes)
+        function montarTabela(dados) {
+            const tbody = document.querySelector('tbody');
+            tbody.innerHTML = ''; 
+
+            if (dados.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5">A planilha está vazia.</td></tr>';
+                return;
+            }
+
+            dados.forEach(linha => {
+                if (linha[1] === "") return; 
+
+                const tr = document.createElement('tr');
+                for(let i = 0; i < 5; i++) {
+                    const td = document.createElement('td');
+                    td.textContent = linha[i] || '-'; 
+                    tr.appendChild(td);
+                }
+                tbody.appendChild(tr);
+            });
+        }
+
+        function mostrarErro(erro) {
+            document.querySelector('tbody').innerHTML = `<tr><td colspan="5" style="color:red;">Erro ao carregar: ${erro.message}</td></tr>`;
+        }
+
+        // Função de PDF aprimorada
+        function gerarPDF() {
+            const elemento = document.getElementById('conteudo-pdf');
+            const areaRolagem = document.getElementById('area-rolagem');
+            const btn = document.getElementById('btn-pdf');
+
+            btn.innerText = "⏳ Gerando PDF...";
+            btn.disabled = true;
+
+            areaRolagem.style.maxHeight = 'none';
+            areaRolagem.style.overflowY = 'visible';
+
+            const opcoes = {
+                margin:       [10, 0, 10, 0],
+                filename:     `Tabela_Colmeia_${dataHoje.replace(/\//g, '-')}.pdf`,
+                image:        { type: 'jpeg', quality: 0.98 },
+                html2canvas:  { scale: 2, useCORS: true }, 
+                jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opcoes).from(elemento).save().then(() => {
+                areaRolagem.style.maxHeight = '60vh';
+                areaRolagem.style.overflowY = 'auto';
+                
+                btn.innerText = "📄 Exportar PDF Completo";
+                btn.disabled = false;
+            });
+        }
+
+        // Inicia a busca de dados ao abrir a página
+        window.onload = carregarDados;
+    </script>
+</body>
+</html>
