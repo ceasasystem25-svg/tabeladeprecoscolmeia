@@ -17,7 +17,6 @@
             padding: 20px;
         }
 
-        /* Botão Flutuante fora do PDF */
         .btn-exportar {
             position: fixed;
             bottom: 20px;
@@ -37,11 +36,10 @@
         .btn-exportar:hover { background-color: #e68a00; transform: scale(1.05); }
         .btn-exportar:disabled { background-color: #ccc; cursor: not-allowed; transform: none; }
 
-        /* Container Principal que vai para o PDF */
         #conteudo-pdf {
             width: 100%;
-            max-width: 900px;
-            background: linear-gradient(rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.85)), 
+            max-width: 1000px; /* Aumentei um pouco para caber a nova coluna */
+            background: linear-gradient(rgba(255, 255, 255, 0.90), rgba(255, 255, 255, 0.90)), 
                         url('https://images.unsplash.com/photo-1610832958506-aa56368176cf?q=80&w=1200&auto=format&fit=crop') center/cover;
             border-radius: 12px;
             box-shadow: 0 8px 16px rgba(0,0,0,0.15);
@@ -50,7 +48,6 @@
             padding-bottom: 20px;
         }
 
-        /* Topo Fixo Moderno */
         header {
             position: sticky;
             top: 0;
@@ -68,13 +65,8 @@
             text-transform: uppercase;
             letter-spacing: 1px;
         }
-        header p {
-            color: #666;
-            font-size: 14px;
-            font-style: italic;
-        }
+        header p { color: #666; font-size: 14px; font-style: italic; }
 
-        /* Container da Tabela com Rolagem */
         .tabela-container {
             max-height: 60vh;
             overflow-y: auto;
@@ -82,7 +74,6 @@
             margin-top: 20px;
         }
 
-        /* Tabela Moderna */
         table {
             width: 100%;
             border-collapse: collapse;
@@ -92,9 +83,10 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
         th, td {
-            padding: 12px 15px;
+            padding: 10px 12px;
             text-align: center;
             border-bottom: 1px solid #eee;
+            font-size: 14px;
         }
         th {
             background-color: #f8f9fa;
@@ -103,13 +95,34 @@
             text-transform: uppercase;
             font-size: 13px;
         }
+        
         td:nth-child(2) {
             text-align: left;
-            font-weight: 600;
             color: #2c3e50;
         }
+
         tbody tr:hover { background-color: #fcfcfc; }
         
+        /* ESTILOS DE OFERTA */
+        .linha-oferta {
+            background-color: #fff8e1 !important; /* Fundo amarelinho bem suave */
+        }
+        .linha-oferta td {
+            font-weight: bold;
+            color: #d84315; /* Texto mais alaranjado para chamar atenção */
+        }
+        .badge-oferta {
+            background-color: #ff3d00;
+            color: white;
+            font-size: 10px;
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 8px;
+            vertical-align: middle;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
         .tabela-container::-webkit-scrollbar { width: 8px; }
         .tabela-container::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 8px; }
         .tabela-container::-webkit-scrollbar-thumb { background: #ff9800; border-radius: 8px; }
@@ -132,13 +145,14 @@
                         <th>Código</th>
                         <th>Produto</th>
                         <th>Peso/Qtd</th>
+                        <th>CX/UND</th>
                         <th>Preço/Emb.</th>
                         <th>Preço Kg/Und</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr>
-                        <td colspan="5" style="padding: 30px;">Conectando ao banco de dados...</td>
+                        <td colspan="6" style="padding: 30px;">Conectando ao banco de dados...</td>
                     </tr>
                 </tbody>
             </table>
@@ -147,22 +161,17 @@
 
     <script>
         // === COLE A URL DO SEU APPS SCRIPT AQUI ===
-        const API_URL = 'https://script.google.com/macros/s/AKfycbxgIXiZ0B9EB6ef4DGlU6ktUMwKNCgc_e9zRAeKYnVH_48y9avldj3YUcRSblApMYNQ/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbwmzjYDJHOqdfzo1sxpsd3rppfptEHcsH997Tc2Ck-P6CQ2-KxOW3VFDDzfFOsI5KsL/exec';
 
         const dataHoje = new Date().toLocaleDateString('pt-BR');
         document.getElementById('data-atual').innerText = `Atualizado em: ${dataHoje}`;
 
-        // Função que busca os dados da API via Fetch
         async function carregarDados() {
             try {
-                // Faz a requisição para o Google Apps Script
                 const resposta = await fetch(API_URL);
-                
                 if (!resposta.ok) throw new Error('Falha na comunicação com o servidor.');
                 
-                // Converte a resposta para JSON
                 const json = await resposta.json();
-                
                 if(json.status === "sucesso") {
                     montarTabela(json.dados);
                 } else {
@@ -173,23 +182,48 @@
             }
         }
 
-        // Monta a tabela (mesma lógica de antes)
         function montarTabela(dados) {
             const tbody = document.querySelector('tbody');
             tbody.innerHTML = ''; 
 
             if (dados.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5">A planilha está vazia.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6">A planilha está vazia.</td></tr>';
                 return;
             }
 
             dados.forEach(linha => {
-                if (linha[1] === "") return; 
+                // Se o nome do produto estiver vazio, pula a linha
+                if (!linha[1] || linha[1].trim() === "") return; 
+
+                // --- LÓGICA 1: SITUAÇÃO (COLUNA H = ÍNDICE 7) ---
+                // Verifica se a situação é "NÃO", "NAO" ou "INDISPONÍVEL"
+                const situacao = linha[7] ? linha[7].toString().toUpperCase().trim() : "";
+                if (situacao === "NÃO" || situacao === "NAO" || situacao.includes("INDISPON")) {
+                    return; // Interrompe e não exibe essa linha
+                }
+
+                // --- LÓGICA 2: OFERTA (COLUNA G = ÍNDICE 6) ---
+                const oferta = linha[6] ? linha[6].toString().toUpperCase().trim() : "";
+                const isOferta = (oferta === "SIM" || oferta === "S");
 
                 const tr = document.createElement('tr');
-                for(let i = 0; i < 5; i++) {
+                
+                // Se for oferta, adiciona a classe CSS para colorir a linha
+                if (isOferta) {
+                    tr.classList.add('linha-oferta');
+                }
+
+                // Cria as 6 colunas visíveis (Índices de 0 a 5)
+                for(let i = 0; i < 6; i++) {
                     const td = document.createElement('td');
-                    td.textContent = linha[i] || '-'; 
+                    
+                    // Se for a coluna "Produto" (Índice 1) e estiver em oferta, coloca o selo 🔥
+                    if (i === 1 && isOferta) {
+                        td.innerHTML = `${linha[i]} <span class="badge-oferta">🔥 Oferta</span>`;
+                    } else {
+                        td.textContent = linha[i] || '-'; 
+                    }
+                    
                     tr.appendChild(td);
                 }
                 tbody.appendChild(tr);
@@ -197,10 +231,9 @@
         }
 
         function mostrarErro(erro) {
-            document.querySelector('tbody').innerHTML = `<tr><td colspan="5" style="color:red;">Erro ao carregar: ${erro.message}</td></tr>`;
+            document.querySelector('tbody').innerHTML = `<tr><td colspan="6" style="color:red;">Erro ao carregar: ${erro.message}</td></tr>`;
         }
 
-        // Função de PDF aprimorada
         function gerarPDF() {
             const elemento = document.getElementById('conteudo-pdf');
             const areaRolagem = document.getElementById('area-rolagem');
@@ -223,13 +256,11 @@
             html2pdf().set(opcoes).from(elemento).save().then(() => {
                 areaRolagem.style.maxHeight = '60vh';
                 areaRolagem.style.overflowY = 'auto';
-                
                 btn.innerText = "📄 Exportar PDF Completo";
                 btn.disabled = false;
             });
         }
 
-        // Inicia a busca de dados ao abrir a página
         window.onload = carregarDados;
     </script>
 </body>
